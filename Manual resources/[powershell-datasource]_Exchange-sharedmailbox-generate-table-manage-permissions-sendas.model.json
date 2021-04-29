@@ -1,0 +1,10 @@
+[
+    {
+        "key":  "sAMAccountName",
+        "type":  0
+    },
+    {
+        "key":  "name",
+        "type":  0
+    }
+]

@@ -1,0 +1,22 @@
+[
+    {
+        "name":  "mailboxAlias",
+        "value":  "{{form.gridMailbox.Alias}}"
+    },
+    {
+        "name":  "mailboxDn",
+        "value":  "{{form.gridMailbox.DistinguishedName}}"
+    },
+    {
+        "name":  "mailboxIdentity",
+        "value":  "{{form.gridMailbox.UserPrincipalName}}"
+    },
+    {
+        "name":  "usersToAddSendAs",
+        "value":  "{{form.sendasList.leftToRight.toJsonString}}"
+    },
+    {
+        "name":  "usersToRemoveSendAs",
+        "value":  "{{form.sendasList.rightToLeft.toJsonString}}"
+    }
+]
