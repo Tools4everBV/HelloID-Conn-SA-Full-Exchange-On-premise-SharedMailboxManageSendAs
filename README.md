@@ -1,6 +1,6 @@
 <!-- Description -->
 ## Description
-This HelloID Service Automation Delegated Form provides Exchange On-Premise Distribution Group functionality. The following options are available:
+This HelloID Service Automation Delegated Form provides Exchange On-Premise shared mailbox functionality. The following options are available:
  1. Search shared mailbox to manage
  2. Select the shared mailbox to manage
  3. Manage members of the shared mailbox who have send-as rights (Add/Remove)
