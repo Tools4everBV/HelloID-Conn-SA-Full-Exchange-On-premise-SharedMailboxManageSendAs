@@ -1,5 +1,5 @@
 # Add TLS1.2 support to the script
-[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor [System.Net.SecurityPrototolType]::Tls12
+[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor [System.Net.SecurityProtocolType]::Tls12
 #HelloID variables
 $script:PortalBaseUrl = "https://CUSTOMER.helloid.com"
 $apiKey = "API_KEY"
