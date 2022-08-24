@@ -16,27 +16,34 @@ $script:duplicateFormSuffix = "_tmp" #the suffix will be added to all HelloID re
 #NOTE: You can also update the HelloID Global variable values afterwards in the HelloID Admin Portal: https://<CUSTOMER>.helloid.com/admin/variablelibrary
 $globalHelloIDVariables = [System.Collections.Generic.List[object]]@();
 
-#Global variable #1 >> exchangeAdminPassword
-$tmpName = @'
-exchangeAdminPassword
-'@ 
-$tmpValue = "" 
-$globalHelloIDVariables.Add([PSCustomObject]@{name = $tmpName; value = $tmpValue; secret = "True"});
-
-#Global variable #2 >> exchangeAdminUsername
-$tmpName = @'
-exchangeAdminUsername
-'@ 
-$tmpValue = @'
-TestAdmin@freque.nl
-'@ 
-$globalHelloIDVariables.Add([PSCustomObject]@{name = $tmpName; value = $tmpValue; secret = "False"});
-
-#Global variable #3 >> ExchangeConnectionUri
+#Global variable #1 >> ExchangeConnectionUri
 $tmpName = @'
 ExchangeConnectionUri
 '@ 
 $tmpValue = "" 
+$globalHelloIDVariables.Add([PSCustomObject]@{name = $tmpName; value = $tmpValue; secret = "False"});
+
+#Global variable #2 >> ExchangeAdminPassword
+$tmpName = @'
+ExchangeAdminPassword
+'@ 
+$tmpValue = "" 
+$globalHelloIDVariables.Add([PSCustomObject]@{name = $tmpName; value = $tmpValue; secret = "False"});
+
+#Global variable #3 >> ExchangeAdminUsername
+$tmpName = @'
+ExchangeAdminUsername
+'@ 
+$tmpValue = "" 
+$globalHelloIDVariables.Add([PSCustomObject]@{name = $tmpName; value = $tmpValue; secret = "False"});
+
+#Global variable #4 >> ADsharedMailboxSearchOU
+$tmpName = @'
+ADsharedMailboxSearchOU
+'@ 
+$tmpValue = @'
+[{"OU": "OU=Shared Mailbox Users,OU=HelloID,DC=Enyoi,DC=local"}]
+'@ 
 $globalHelloIDVariables.Add([PSCustomObject]@{name = $tmpName; value = $tmpValue; secret = "False"});
 
 
@@ -102,7 +109,7 @@ function Invoke-HelloIDGlobalVariable {
                 secret   = $Secret;
                 ItemType = 0;
             }    
-            $body = ConvertTo-Json -InputObject $body
+            $body = ConvertTo-Json -InputObject $body -Depth 100
     
             $uri = ($script:PortalBaseUrl + "api/v1/automation/variable")
             $response = Invoke-RestMethod -Method Post -Uri $uri -Headers $script:headers -ContentType "application/json" -Verbose:$false -Body $body
@@ -148,7 +155,7 @@ function Invoke-HelloIDAutomationTask {
                 objectGuid          = $ObjectGuid;
                 variables           = (ConvertFrom-Json-WithEmptyArray($Variables));
             }
-            $body = ConvertTo-Json -InputObject $body
+            $body = ConvertTo-Json -InputObject $body -Depth 100
     
             $uri = ($script:PortalBaseUrl +"api/v1/automationtasks/powershell")
             $response = Invoke-RestMethod -Method Post -Uri $uri -Headers $script:headers -ContentType "application/json" -Verbose:$false -Body $body
@@ -203,7 +210,7 @@ function Invoke-HelloIDDatasource {
                 script             = $DatasourcePsScript;
                 input              = (ConvertFrom-Json-WithEmptyArray($DatasourceInput));
             }
-            $body = ConvertTo-Json -InputObject $body
+            $body = ConvertTo-Json -InputObject $body -Depth 100
       
             $uri = ($script:PortalBaseUrl +"api/v1/datasource")
             $response = Invoke-RestMethod -Method Post -Uri $uri -Headers $script:headers -ContentType "application/json" -Verbose:$false -Body $body
@@ -268,10 +275,11 @@ function Invoke-HelloIDDelegatedForm {
     param(
         [parameter(Mandatory)][String]$DelegatedFormName,
         [parameter(Mandatory)][String]$DynamicFormGuid,
-        [parameter()][String][AllowEmptyString()]$AccessGroups,
+        [parameter()][Array][AllowEmptyString()]$AccessGroups,
         [parameter()][String][AllowEmptyString()]$Categories,
         [parameter(Mandatory)][String]$UseFaIcon,
         [parameter()][String][AllowEmptyString()]$FaIcon,
+        [parameter()][String][AllowEmptyString()]$task,
         [parameter(Mandatory)][Ref]$returnObject
     )
     $delegatedFormCreated = $false
@@ -291,11 +299,16 @@ function Invoke-HelloIDDelegatedForm {
                 name            = $DelegatedFormName;
                 dynamicFormGUID = $DynamicFormGuid;
                 isEnabled       = "True";
-                accessGroups    = (ConvertFrom-Json-WithEmptyArray($AccessGroups));
                 useFaIcon       = $UseFaIcon;
                 faIcon          = $FaIcon;
-            }    
-            $body = ConvertTo-Json -InputObject $body
+                task            = ConvertFrom-Json -inputObject $task;
+            }
+            if(-not[String]::IsNullOrEmpty($AccessGroups)) { 
+                $body += @{
+                    accessGroups    = (ConvertFrom-Json-WithEmptyArray($AccessGroups));
+                }
+            }
+            $body = ConvertTo-Json -InputObject $body -Depth 100
     
             $uri = ($script:PortalBaseUrl +"api/v1/delegatedforms")
             $response = Invoke-RestMethod -Method Post -Uri $uri -Headers $script:headers -ContentType "application/json" -Verbose:$false -Body $body
@@ -320,6 +333,8 @@ function Invoke-HelloIDDelegatedForm {
     $returnObject.value.guid = $delegatedFormGuid
     $returnObject.value.created = $delegatedFormCreated
 }
+
+
 <# Begin: HelloID Global Variables #>
 foreach ($item in $globalHelloIDVariables) {
 	Invoke-HelloIDGlobalVariable -Name $item.name -Value $item.value -Secret $item.secret 
@@ -557,7 +572,7 @@ Invoke-HelloIDDatasource -DatasourceName $dataSourceGuid_0_Name -DatasourceType 
 
 <# Begin: Dynamic Form "Exchange on-premise - Manage send as permissions shared mailbox" #>
 $tmpSchema = @"
-[{"label":"Details","fields":[{"key":"searchMailbox","templateOptions":{"label":"Search","placeholder":""},"type":"input","summaryVisibility":"Hide element","requiresTemplateOptions":true,"requiresKey":true},{"key":"gridMailbox","templateOptions":{"label":"Mailbox","required":true,"grid":{"columns":[{"headerName":"Display Name","field":"displayName"},{"headerName":"Alias","field":"Alias"},{"headerName":"User Principal Name","field":"UserPrincipalName"}],"height":300,"rowSelection":"single"},"dataSourceConfig":{"dataSourceGuid":"$dataSourceGuid_0","input":{"propertyInputs":[{"propertyName":"searchMailbox","otherFieldValue":{"otherFieldKey":"searchMailbox"}}]}},"defaultSelectorProperty":"DistinguishedName"},"type":"grid","summaryVisibility":"Show","requiresTemplateOptions":true,"requiresKey":true}]},{"label":"Mailbox Permissions","fields":[{"key":"sendasList","templateOptions":{"label":"Send As permissions","required":false,"filterable":true,"useDataSource":true,"dualList":{"options":[{"guid":"75ea2890-88f8-4851-b202-626123054e14","Name":"Apple"},{"guid":"0607270d-83e2-4574-9894-0b70011b663f","Name":"Pear"},{"guid":"1ef6fe01-3095-4614-a6db-7c8cd416ae3b","Name":"Orange"}],"optionKeyProperty":"sAMAccountName","optionDisplayProperty":"name"},"dataSourceConfig":{"dataSourceGuid":"$dataSourceGuid_1","input":{"propertyInputs":[]}},"destinationDataSourceConfig":{"dataSourceGuid":"$dataSourceGuid_2","input":{"propertyInputs":[{"propertyName":"selectedMailbox","otherFieldValue":{"otherFieldKey":"gridMailbox"}}]}}},"type":"duallist","summaryVisibility":"Show","sourceDataSourceIdentifierSuffix":"source-datasource","destinationDataSourceIdentifierSuffix":"destination-datasource","requiresTemplateOptions":true,"requiresKey":true}]}]
+[{"label":"Details","fields":[{"key":"searchMailbox","templateOptions":{"label":"Search","placeholder":""},"type":"input","summaryVisibility":"Hide element","requiresTemplateOptions":true,"requiresKey":true,"requiresDataSource":false},{"key":"gridMailbox","templateOptions":{"label":"Mailbox","required":true,"grid":{"columns":[{"headerName":"Display Name","field":"displayName"},{"headerName":"Alias","field":"Alias"},{"headerName":"User Principal Name","field":"UserPrincipalName"}],"height":300,"rowSelection":"single"},"dataSourceConfig":{"dataSourceGuid":"$dataSourceGuid_0","input":{"propertyInputs":[{"propertyName":"searchMailbox","otherFieldValue":{"otherFieldKey":"searchMailbox"}}]}},"defaultSelectorProperty":"DistinguishedName"},"type":"grid","summaryVisibility":"Show","requiresTemplateOptions":true,"requiresKey":true,"requiresDataSource":true}]},{"label":"Mailbox Permissions","fields":[{"key":"sendasList","templateOptions":{"label":"Send As permissions","required":false,"filterable":true,"useDataSource":true,"dualList":{"options":[{"guid":"75ea2890-88f8-4851-b202-626123054e14","Name":"Apple"},{"guid":"0607270d-83e2-4574-9894-0b70011b663f","Name":"Pear"},{"guid":"1ef6fe01-3095-4614-a6db-7c8cd416ae3b","Name":"Orange"}],"optionKeyProperty":"sAMAccountName","optionDisplayProperty":"name"},"dataSourceConfig":{"dataSourceGuid":"$dataSourceGuid_1","input":{"propertyInputs":[]}},"destinationDataSourceConfig":{"dataSourceGuid":"$dataSourceGuid_2","input":{"propertyInputs":[{"propertyName":"selectedMailbox","otherFieldValue":{"otherFieldKey":"gridMailbox"}}]}}},"type":"duallist","summaryVisibility":"Show","sourceDataSourceIdentifierSuffix":"source-datasource","destinationDataSourceIdentifierSuffix":"destination-datasource","requiresTemplateOptions":true,"requiresKey":true,"requiresDataSource":false}]}]
 "@ 
 
 $dynamicFormGuid = [PSCustomObject]@{} 
@@ -569,19 +584,23 @@ Invoke-HelloIDDynamicForm -FormName $dynamicFormName -FormSchema $tmpSchema  -re
 
 <# Begin: Delegated Form Access Groups and Categories #>
 $delegatedFormAccessGroupGuids = @()
-foreach($group in $delegatedFormAccessGroupNames) {
-    try {
-        $uri = ($script:PortalBaseUrl +"api/v1/groups/$group")
-        $response = Invoke-RestMethod -Method Get -Uri $uri -Headers $script:headers -ContentType "application/json" -Verbose:$false
-        $delegatedFormAccessGroupGuid = $response.groupGuid
-        $delegatedFormAccessGroupGuids += $delegatedFormAccessGroupGuid
-        
-        Write-Information "HelloID (access)group '$group' successfully found$(if ($script:debugLogging -eq $true) { ": " + $delegatedFormAccessGroupGuid })"
-    } catch {
-        Write-Error "HelloID (access)group '$group', message: $_"
+if(-not[String]::IsNullOrEmpty($delegatedFormAccessGroupNames)){
+    foreach($group in $delegatedFormAccessGroupNames) {
+        try {
+            $uri = ($script:PortalBaseUrl +"api/v1/groups/$group")
+            $response = Invoke-RestMethod -Method Get -Uri $uri -Headers $script:headers -ContentType "application/json" -Verbose:$false
+            $delegatedFormAccessGroupGuid = $response.groupGuid
+            $delegatedFormAccessGroupGuids += $delegatedFormAccessGroupGuid
+            
+            Write-Information "HelloID (access)group '$group' successfully found$(if ($script:debugLogging -eq $true) { ": " + $delegatedFormAccessGroupGuid })"
+        } catch {
+            Write-Error "HelloID (access)group '$group', message: $_"
+        }
+    }
+    if($null -ne $delegatedFormAccessGroupGuids){
+        $delegatedFormAccessGroupGuids = ($delegatedFormAccessGroupGuids | Select-Object -Unique | ConvertTo-Json -Depth 100 -Compress)
     }
 }
-$delegatedFormAccessGroupGuids = ($delegatedFormAccessGroupGuids | Select-Object -Unique | ConvertTo-Json -Compress)
 
 $delegatedFormCategoryGuids = @()
 foreach($category in $delegatedFormCategories) {
@@ -597,7 +616,7 @@ foreach($category in $delegatedFormCategories) {
         $body = @{
             name = @{"en" = $category};
         }
-        $body = ConvertTo-Json -InputObject $body
+        $body = ConvertTo-Json -InputObject $body -Depth 100
 
         $uri = ($script:PortalBaseUrl +"api/v1/delegatedformcategories")
         $response = Invoke-RestMethod -Method Post -Uri $uri -Headers $script:headers -ContentType "application/json" -Verbose:$false -Body $body
@@ -607,7 +626,7 @@ foreach($category in $delegatedFormCategories) {
         Write-Information "HelloID Delegated Form category '$category' successfully created$(if ($script:debugLogging -eq $true) { ": " + $tmpGuid })"
     }
 }
-$delegatedFormCategoryGuids = (ConvertTo-Json -InputObject $delegatedFormCategoryGuids -Compress)
+$delegatedFormCategoryGuids = (ConvertTo-Json -InputObject $delegatedFormCategoryGuids -Depth 100 -Compress)
 <# End: Delegated Form Access Groups and Categories #>
 
 <# Begin: Delegated Form #>
@@ -615,123 +634,10 @@ $delegatedFormRef = [PSCustomObject]@{guid = $null; created = $null}
 $delegatedFormName = @'
 Exchange on-premise - Manage send as permissions shared mailbox
 '@
-Invoke-HelloIDDelegatedForm -DelegatedFormName $delegatedFormName -DynamicFormGuid $dynamicFormGuid -AccessGroups $delegatedFormAccessGroupGuids -Categories $delegatedFormCategoryGuids -UseFaIcon "True" -FaIcon "fa fa-pencil-square" -returnObject ([Ref]$delegatedFormRef) 
-<# End: Delegated Form #>
-
-<# Begin: Delegated Form Task #>
-if($delegatedFormRef.created -eq $true) { 
-	$tmpScript = @'
-# Fixed values
-$AutoMapping = $false
-
-try {
-    <#----- Exchange On-Premises: Start -----#>
-    # Connect to Exchange
-    try {
-        $adminSecurePassword = ConvertTo-SecureString -String "$ExchangeAdminPassword" -AsPlainText -Force
-        $adminCredential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $ExchangeAdminUsername, $adminSecurePassword
-        $sessionOption = New-PSSessionOption -SkipCACheck -SkipCNCheck -SkipRevocationCheck
-        $exchangeSession = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri $exchangeConnectionUri -Credential $adminCredential -SessionOption $sessionOption -ErrorAction Stop 
-        #-AllowRedirection
-        $null = Import-PSSession $exchangeSession -DisableNameChecking -AllowClobber
-        HID-Write-Status -Message "Successfully connected to Exchange using the URI [$exchangeConnectionUri]" -Event Success
-    }
-    catch {
-        HID-Write-Status -Message "Error connecting to Exchange using the URI [$exchangeConnectionUri]" -Event Error
-        HID-Write-Status -Message "Error at line: $($_.InvocationInfo.ScriptLineNumber - 79): $($_.Exception.Message)" -Event Error
-        if ($debug -eq $true) {
-            HID-Write-Status -Message "$($_.Exception)" -Event Error
-        }
-        HID-Write-Summary -Message "Failed to connect to Exchange using the URI [$exchangeConnectionUri]" -Event Failed
-        throw $_
-    }
-
-    Hid-Write-Status -Message "Checking if mailbox with identity '$($mailboxAlias)' exists" -Event Information
-    $mailbox = Get-Mailbox -Identity $mailboxAlias -ErrorAction Stop
-    if ($mailbox.Name.Count -eq 0) {
-        throw "Could not find shared mailbox with identity '$($mailboxAlias)'"
-    }
-        
-    
-    # Add Send As Permissions for Mail-enabled Security Group for users
-    try { 
-        # Add Send As Permissions
-        if ($usersToAddSendAs -ne "[]") {
-            HID-Write-Status -Message "Starting to add send as members to mailbox $($mailboxAlias)" -Event Information
-            $usersToAddJson = $usersToAddSendAs | ConvertFrom-Json
-            foreach ($user in $usersToAddJson) {
-                
-                Add-ADPermission -Identity $mailboxDn -AccessRights ExtendedRight -ExtendedRights "Send As" -Confirm:$false -User $user.sAMAccountName -ErrorAction Stop
-                
-                Hid-Write-Status -Message "Assigned access rights [SendAs] for mailbox [$($mailboxAlias)] to [$($user.sAMAccountName)] successfully" -Event Success
-                HID-Write-Summary -Message "Assigned access rights [SendAs] for mailbox [$($mailboxAlias)] to [$($user.sAMAccountName)] successfully" -Event Success
-            }
-        }
-        
-    }
-    catch {
-        HID-Write-Status -Message "Error assigning access rights [SendAs] for mailbox [$($mailboxAlias)] to [$($user.sAMAccountName)]. Error: $($_.Exception.Message)" -Event Error
-        HID-Write-Summary -Message "Error assigning access rights [SendAs] for mailbox [$($mailboxAlias)] to [$($user.sAMAccountName)]" -Event Failed
-        throw $_
-    }
-
-    # Remove Send As Permissions for Mail-enabled Security Group for users
-    try { 
-        # Remove Send As Permissions
-        if ($usersToRemoveSendAs -ne "[]") {
-            HID-Write-Status -Message "Starting to remove send as members to mailbox $($mailboxAlias)" -Event Information
-            $usersToAddJson = $usersToRemoveSendAs | ConvertFrom-Json
-            foreach ($user in $usersToAddJson) {
-                
-                Remove-ADPermission -Identity $mailboxDn -ExtendedRights "Send As" -Confirm:$false -User $user.sAMAccountName -ErrorAction Stop
-                
-                Hid-Write-Status -Message "Removing access rights [SendAs] for mailbox [$($mailboxAlias)] to [$($user.sAMAccountName)] successfully" -Event Success
-                HID-Write-Summary -Message "Removing access rights [SendAs] for mailbox [$($mailboxAlias)] to [$($user.sAMAccountName)] successfully" -Event Success
-            }
-        }
-        
-    }
-    catch {
-        HID-Write-Status -Message "Error removing access rights [SendAs] for mailbox [$($mailboxAlias)] to [$($user.sAMAccountName)]. Error: $($_.Exception.Message)" -Event Error
-        HID-Write-Summary -Message "Error removing access rights [SendAs] for mailbox [$($mailboxAlias)] to [$($user.sAMAccountName)]" -Event Failed
-        throw $_
-    }
-}
-catch {
-    HID-Write-Status -Message "Error removing access rights for mailbox [$($mailboxAlias)] to the user [$($user.sAMAccountName)]. Error: $($_.Exception.Message)" -Event Error
-    HID-Write-Summary -Message "Error removing access rights for mailbox [$($mailboxAlias)] to the user [$($user.sAMAccountName)]" -Event Failed
-}
-finally {
-    # Disconnect from Exchange
-    try {
-        Remove-PsSession -Session $exchangeSession -Confirm:$false -ErrorAction Stop
-        HID-Write-Status -Message "Successfully disconnected from Exchange" -Event Success
-    }
-    catch {
-        HID-Write-Status -Message "Error disconnecting from Exchange" -Event Error
-        HID-Write-Status -Message "Error at line: $($_.InvocationInfo.ScriptLineNumber - 79): $($_.Exception.Message)" -Event Error
-        if ($debug -eq $true) {
-            HID-Write-Status -Message "$($_.Exception)" -Event Error
-        }
-        HID-Write-Summary -Message "Failed to disconnect from Exchange" -Event Failed
-        throw $_
-    }
-    <#----- Exchange On-Premises: End -----#>
-}
-
-
-'@; 
-
-	$tmpVariables = @'
-[{"name":"mailboxAlias","value":"{{form.gridMailbox.Alias}}","secret":false,"typeConstraint":"string"},{"name":"mailboxDn","value":"{{form.gridMailbox.DistinguishedName}}","secret":false,"typeConstraint":"string"},{"name":"mailboxIdentity","value":"{{form.gridMailbox.UserPrincipalName}}","secret":false,"typeConstraint":"string"},{"name":"usersToAddSendAs","value":"{{form.sendasList.leftToRight.toJsonString}}","secret":false,"typeConstraint":"string"},{"name":"usersToRemoveSendAs","value":"{{form.sendasList.rightToLeft.toJsonString}}","secret":false,"typeConstraint":"string"}]
+$tmpTask = @'
+{"name":"Exchange on-premise - Manage send as permissions shared mailbox","script":"$VerbosePreference = \"SilentlyContinue\"\r\n$InformationPreference = \"Continue\"\r\n$WarningPreference = \"Continue\"\r\n\r\n# variables configured in form\r\n$mailboxAlias = $form.gridMailbox.Alias\r\n$mailboxDn = $form.gridMailbox.DistinguishedName\r\n$usersToAddSendAs = $form.sendasList.leftToRight\r\n$usersToRemoveSendAs = $form.sendasList.rightToLeft\r\n\r\ntry {\r\n    \u003c#----- Exchange On-Premises: Start -----#\u003e\r\n    # Connect to Exchange\r\n    try {\r\n        $adminSecurePassword = ConvertTo-SecureString -String \"$ExchangeAdminPassword\" -AsPlainText -Force\r\n        $adminCredential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $ExchangeAdminUsername, $adminSecurePassword\r\n        $sessionOption = New-PSSessionOption -SkipCACheck -SkipCNCheck -SkipRevocationCheck\r\n        $exchangeSession = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri $exchangeConnectionUri -Credential $adminCredential -SessionOption $sessionOption -ErrorAction Stop \r\n        #-AllowRedirection\r\n        $session = Import-PSSession $exchangeSession -DisableNameChecking -AllowClobber\r\n    \r\n        Write-Information \"Successfully connected to Exchange using the URI [$exchangeConnectionUri]\" \r\n    \r\n        $Log = @{\r\n            Action            = \"UpdateResource\" # optional. ENUM (undefined = default) \r\n            System            = \"Exchange On-Premise\" # optional (free format text) \r\n            Message           = \"Successfully connected to Exchange using the URI [$exchangeConnectionUri]\" # required (free format text) \r\n            IsError           = $false # optional. Elastic reporting purposes only. (default = $false. $true = Executed action returned an error) \r\n            TargetDisplayName = $exchangeConnectionUri # optional (free format text) \r\n            TargetIdentifier  = $([string]$session.GUID) # optional (free format text) \r\n        }\r\n        #send result back  \r\n        Write-Information -Tags \"Audit\" -MessageData $log\r\n    }\r\n    catch {\r\n        Write-Error \"Error connecting to Exchange using the URI [$exchangeConnectionUri]. Error: $($_.Exception.Message)\"\r\n        $Log = @{\r\n            Action            = \"UpdateResource\" # optional. ENUM (undefined = default) \r\n            System            = \"Exchange On-Premise\" # optional (free format text) \r\n            Message           = \"Failed to connect to Exchange using the URI [$exchangeConnectionUri].\" # required (free format text) \r\n            IsError           = $true # optional. Elastic reporting purposes only. (default = $false. $true = Executed action returned an error) \r\n            TargetDisplayName = $exchangeConnectionUri # optional (free format text) \r\n            TargetIdentifier  = $([string]$session.GUID) # optional (free format text) \r\n        }\r\n        #send result back  \r\n        Write-Information -Tags \"Audit\" -MessageData $log\r\n    }\r\n\r\n    #Write-Information \"Checking if mailbox with identity \u0027$($mailboxAlias)\u0027 exists\"\r\n    $mailbox = Get-Mailbox -Identity $mailboxAlias -ErrorAction Stop | Select-Object Guid\r\n    if ($mailbox.Guid.Count -eq 0) {\r\n        Write-Error \"Could not find shared mailbox with identity \u0027$($mailboxAlias)\u0027\"\r\n    }\r\n        \r\n    # Add Send As Permissions for Mail-enabled Security Group for users\r\n    try { \r\n        # Add Send As Permissions\r\n        if ($usersToAddSendAs.count -gt 0) {\r\n            Write-Information \"Starting to add send as members to mailbox $($mailboxAlias)\"\r\n            \r\n            foreach ($user in $usersToAddSendAs) {\r\n                try {                    \r\n                    Add-ADPermission -Identity $mailboxDn -AccessRights ExtendedRight -ExtendedRights \"Send As\" -Confirm:$false -User $user.sAMAccountName -ErrorAction Stop\r\n                    Write-Information \"Assigned access rights [SendAs] on mailbox [$($mailboxAlias)] for [$($user.sAMAccountName)] successfully.\"\r\n                    $Log = @{\r\n                        Action            = \"UpdateResource\" # optional. ENUM (undefined = default) \r\n                        System            = \"Exchange On-Premise\" # optional (free format text) \r\n                        Message           = \"Assigned access rights [SendAs] on mailbox [$($mailboxAlias)] for [$($user.sAMAccountName)] successfully.\" # required (free format text) \r\n                        IsError           = $false # optional. Elastic reporting purposes only. (default = $false. $true = Executed action returned an error) \r\n                        TargetDisplayName = $mailboxAlias # optional (free format text) \r\n                        TargetIdentifier  = $([string]$mailbox.Guid) # optional (free format text) \r\n                    }\r\n                    #send result back  \r\n                    Write-Information -Tags \"Audit\" -MessageData $log \r\n                }\r\n                catch {\r\n                    Write-Error \"Error assigning access rights [SendAs] for $($user.sAMAccountName) on mailbox [$($mailboxAlias)]. Error: $($_.Exception.Message)\" \r\n                    $Log = @{\r\n                        Action            = \"UpdateResource\" # optional. ENUM (undefined = default) \r\n                        System            = \"Exchange On-Premise\" # optional (free format text) \r\n                        Message           = \"Error assigning access rights to $($user.sAMAccountName) on mailbox [$($mailboxAlias)]\" # required (free format text) \r\n                        IsError           = $true # optional. Elastic reporting purposes only. (default = $false. $true = Executed action returned an error) \r\n                        TargetDisplayName = $mailboxAlias # optional (free format text) \r\n                        TargetIdentifier  = $([string]$mailbox.Guid) # optional (free format text) \r\n                    }\r\n                    #send result back  \r\n                    Write-Information -Tags \"Audit\" -MessageData $log\r\n                }\r\n            }\r\n        }        \r\n    }\r\n    catch {\r\n        Write-Error \"Error assigning access rights [SendAs] for $($usersToAddSendAs.sAMAccountName) on mailbox [$($mailboxAlias)]. Error: $($_.Exception.Message)\" \r\n        $Log = @{\r\n            Action            = \"UpdateResource\" # optional. ENUM (undefined = default) \r\n            System            = \"Exchange On-Premise\" # optional (free format text) \r\n            Message           = \"Error assigning access rights [SendAs] to $($usersToAddSendAs.sAMAccountName) on mailbox [$($mailboxAlias)]\" # required (free format text) \r\n            IsError           = $true # optional. Elastic reporting purposes only. (default = $false. $true = Executed action returned an error) \r\n            TargetDisplayName = $mailboxAlias # optional (free format text) \r\n            TargetIdentifier  = $([string]$mailbox.Guid) # optional (free format text) \r\n        }\r\n        #send result back  \r\n        Write-Information -Tags \"Audit\" -MessageData $log\r\n    }\r\n\r\n    # Remove Send As Permissions for Mail-enabled Security Group for users\r\n    try { \r\n        # Remove Send As Permissions\r\n        if ($usersToRemoveSendAs.Count -gt 0) {\r\n            Write-Information \"Starting to remove send as members to mailbox $($mailboxAlias)\"\r\n            \r\n            foreach ($user in $usersToRemoveSendAs) {\r\n                try {\r\n                    Remove-ADPermission -Identity $mailboxDn -ExtendedRights \"Send As\" -Confirm:$false -User $user.sAMAccountName -ErrorAction Stop\r\n                \r\n                    Write-Information \"Removing access rights [SendAs] on mailbox [$($mailboxAlias)] for [$($user.sAMAccountName)] successfully\"\r\n                    $Log = @{\r\n                        Action            = \"UpdateResource\" # optional. ENUM (undefined = default) \r\n                        System            = \"Exchange On-Premise\" # optional (free format text) \r\n                        Message           = \"Removing access rights [SendAs] on mailbox [$($mailboxAlias)] for [$($user.sAMAccountName)] successfully.\" # required (free format text) \r\n                        IsError           = $false # optional. Elastic reporting purposes only. (default = $false. $true = Executed action returned an error) \r\n                        TargetDisplayName = $mailboxAlias # optional (free format text) \r\n                        TargetIdentifier  = $([string]$mailbox.Guid) # optional (free format text) \r\n                    }\r\n                    #send result back  \r\n                    Write-Information -Tags \"Audit\" -MessageData $log\r\n                }\r\n                catch {\r\n                    Write-Error \"Error removing access rights [SendAs] on mailbox [$($mailboxAlias)] for [$($user.sAMAccountName)]. Error: $($_.Exception.Message)\"\r\n                    $Log = @{\r\n                        Action            = \"UpdateResource\" # optional. ENUM (undefined = default) \r\n                        System            = \"Exchange On-Premise\" # optional (free format text) \r\n                        Message           = \"Error removing access rights [SendAs] on mailbox [$($mailboxAlias)] for [$($user.sAMAccountName)].\" # required (free format text) \r\n                        IsError           = $true # optional. Elastic reporting purposes only. (default = $false. $true = Executed action returned an error) \r\n                        TargetDisplayName = $mailboxAlias # optional (free format text) \r\n                        TargetIdentifier  = $([string]$mailbox.Guid) # optional (free format text) \r\n                    }\r\n                    #send result back  \r\n                    Write-Information -Tags \"Audit\" -MessageData $log\r\n                }\r\n            }\r\n        }\r\n        \r\n    }\r\n    catch {\r\n        Write-Error \"Error removing access rights [SendAs] on mailbox [$($mailboxAlias)] for [$($usersToRemoveSendAs.sAMAccountName)].\"\r\n        $Log = @{\r\n            Action            = \"UpdateResource\" # optional. ENUM (undefined = default) \r\n            System            = \"Exchange On-Premise\" # optional (free format text) \r\n            Message           = \"Error removing access rights [SendAs] on mailbox [$($mailboxAlias)] for [$($ususersToRemoveSendAser.sAMAccountName)].\" # required (free format text) \r\n            IsError           = $true # optional. Elastic reporting purposes only. (default = $false. $true = Executed action returned an error) \r\n            TargetDisplayName = $mailboxAlias # optional (free format text) \r\n            TargetIdentifier  = $([string]$mailbox.Guid) # optional (free format text) \r\n        }\r\n        #send result back  \r\n        Write-Information -Tags \"Audit\" -MessageData $log\r\n    }\r\n}\r\ncatch {\r\n    Write-Error \"Error setting access rights [SendAs] on mailbox [$($mailboxAlias)]. Error: $($_.Exception.Message)\"\r\n    $Log = @{\r\n        Action            = \"UpdateResource\" # optional. ENUM (undefined = default) \r\n        System            = \"Exchange On-Premise\" # optional (free format text) \r\n        Message           = \"Error setting access rights [SendAs] on mailbox [$($mailboxAlias)].\" # required (free format text) \r\n        IsError           = $true # optional. Elastic reporting purposes only. (default = $false. $true = Executed action returned an error) \r\n        TargetDisplayName = $exchangeConnectionUri # optional (free format text) \r\n        TargetIdentifier  = $([string]$session.GUID) # optional (free format text) \r\n    }\r\n    #send result back  \r\n    Write-Information -Tags \"Audit\" -MessageData $log    \r\n}\r\nfinally {\r\n    # Disconnect from Exchange\r\n    try {\r\n        Remove-PsSession -Session $exchangeSession -Confirm:$false -ErrorAction Stop\r\n        Write-Information \"Successfully disconnected from Exchange using the URI [$exchangeConnectionUri]\"     \r\n        $Log = @{\r\n            Action            = \"UpdateResource\" # optional. ENUM (undefined = default) \r\n            System            = \"Exchange On-Premise\" # optional (free format text) \r\n            Message           = \"Successfully disconnected from Exchange using the URI [$exchangeConnectionUri]\" # required (free format text) \r\n            IsError           = $false # optional. Elastic reporting purposes only. (default = $false. $true = Executed action returned an error) \r\n            TargetDisplayName = $exchangeConnectionUri # optional (free format text) \r\n            TargetIdentifier  = $([string]$session.GUID) # optional (free format text) \r\n        }\r\n        #send result back  \r\n        Write-Information -Tags \"Audit\" -MessageData $log\r\n    }\r\n    catch {\r\n        Write-Error \"Error disconnecting from Exchange.  Error: $($_.Exception.Message)\"\r\n        $Log = @{\r\n            Action            = \"UpdateResource\" # optional. ENUM (undefined = default) \r\n            System            = \"Exchange On-Premise\" # optional (free format text) \r\n            Message           = \"Failed to disconnect from Exchange using the URI [$exchangeConnectionUri].\" # required (free format text) \r\n            IsError           = $true # optional. Elastic reporting purposes only. (default = $false. $true = Executed action returned an error) \r\n            TargetDisplayName = $exchangeConnectionUri # optional (free format text) \r\n            TargetIdentifier  = $([string]$session.GUID) # optional (free format text) \r\n        }\r\n        #send result back  \r\n        Write-Information -Tags \"Audit\" -MessageData $log \r\n    }\r\n    \u003c#----- Exchange On-Premises: End -----#\u003e\r\n}\r\n\r\n","runInCloud":false}
 '@ 
 
-	$delegatedFormTaskGuid = [PSCustomObject]@{} 
-$delegatedFormTaskName = @'
-Exchange-on-premise-manage-send-as-shared-mailbox-permissions
-'@
-	Invoke-HelloIDAutomationTask -TaskName $delegatedFormTaskName -UseTemplate "False" -AutomationContainer "8" -Variables $tmpVariables -PowershellScript $tmpScript -ObjectGuid $delegatedFormRef.guid -ForceCreateTask $true -returnObject ([Ref]$delegatedFormTaskGuid) 
-} else {
-	Write-Warning "Delegated form '$delegatedFormName' already exists. Nothing to do with the Delegated Form task..." 
-}
-<# End: Delegated Form Task #>
+Invoke-HelloIDDelegatedForm -DelegatedFormName $delegatedFormName -DynamicFormGuid $dynamicFormGuid -AccessGroups $delegatedFormAccessGroupGuids -Categories $delegatedFormCategoryGuids -UseFaIcon "True" -FaIcon "fa fa-pencil-square" -task $tmpTask -returnObject ([Ref]$delegatedFormRef) 
+<# End: Delegated Form #>
+

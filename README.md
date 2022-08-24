@@ -9,6 +9,7 @@ This HelloID Service Automation Delegated Form provides Exchange On-Premise shar
 ## Versioning
 | Version | Description | Date |
 | - | - | - |
+| 1.0.2   | Added version number and updated code for SA-agent and auditlogging | 2022/08/24  |
 | 1.0.1   | Added version number and updated all-in-one script | 2021/11/16  |
 | 1.0.0   | Initial release | 2021/04/29  |
 
@@ -53,7 +54,7 @@ This Powershell data source runs an Exchange query to get current members with s
 ### Powershell data source 'Exchange-user-generate-table-sharedmailbox-manage-memberships'
 This Powershell data source runs an Exchange query to list available mailusers.
 
-### Delegated form task 'Exchange on-premise-manage-sendas-shared-mailbox-permissions'
+### Delegated form task 'Exchange on-premise - Manage send as permissions shared mailbox'
 This delegated form task will update the sendas rights to the shared mailbox in Exchange.
 
 ## Getting help
